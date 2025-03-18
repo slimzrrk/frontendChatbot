@@ -1,5 +1,13 @@
 import React, { useState } from 'react';
-import { View, FlatList, StyleSheet, TouchableOpacity } from 'react-native';
+import {
+  View,
+  FlatList,
+  StyleSheet,
+  TouchableOpacity,
+  TextInput,
+  KeyboardAvoidingView,
+  Platform,
+} from 'react-native';
 import { askChatbot, uploadAudioToWhisper } from '../services/api';
 import { Audio } from 'expo-av';
 import { Ionicons } from '@expo/vector-icons';
@@ -10,7 +18,12 @@ const ChatScreen = () => {
   const [messages, setMessages] = useState([]);
   const [recording, setRecording] = useState(null);
   const [isRecording, setIsRecording] = useState(false);
+  const [textInput, setTextInput] = useState('');
   const userId = 'child_001';
+
+  const addMessage = (sender, text) => {
+    setMessages(prev => [...prev, { sender, text }]);
+  };
 
   const startRecording = async () => {
     try {
@@ -66,11 +79,9 @@ const ChatScreen = () => {
 
       setRecording(null);
 
-      // 1. Transcription via Whisper
       const transcription = await uploadAudioToWhisper(uri);
       addMessage('user', transcription);
 
-      // 2. Réponse de GPT
       const reply = await askChatbot(userId, transcription);
       addMessage('bot', reply);
     } catch (err) {
@@ -78,42 +89,94 @@ const ChatScreen = () => {
     }
   };
 
-  const addMessage = (sender, text) => {
-    setMessages(prev => [...prev, { sender, text }]);
+  const handleTextSubmit = async () => {
+    if (!textInput.trim()) return;
+
+    const message = textInput.trim();
+    setTextInput('');
+    addMessage('user', message);
+
+    try {
+      const reply = await askChatbot(userId, message);
+      addMessage('bot', reply);
+    } catch (err) {
+      console.error("❌ Erreur GPT texte :", err.message);
+    }
   };
 
   return (
-    <View style={styles.container}>
+    <KeyboardAvoidingView style={styles.container} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
       <FlatList
         data={messages}
         keyExtractor={(_, i) => i.toString()}
         renderItem={({ item }) => <ChatMessage message={item} />}
-        contentContainerStyle={{ paddingBottom: 80 }}
+        contentContainerStyle={{ paddingBottom: 100 }}
       />
 
-      <TouchableOpacity
-        style={[styles.micButton, isRecording && styles.recording]}
-        onPress={isRecording ? stopRecording : startRecording}
-      >
-        <Ionicons name={isRecording ? 'stop' : 'mic'} size={32} color="#fff" />
-      </TouchableOpacity>
-    </View>
+      <View style={styles.inputContainer}>
+        <TextInput
+          style={styles.input}
+          placeholder="اكتب سؤالك هنا..."
+          value={textInput}
+          onChangeText={setTextInput}
+          returnKeyType="send"
+          onSubmitEditing={handleTextSubmit}
+        />
+
+        {textInput.trim() === '' ? (
+          <TouchableOpacity
+            style={[styles.micButton, isRecording && styles.recording]}
+            onPress={isRecording ? stopRecording : startRecording}
+          >
+            <Ionicons name={isRecording ? 'stop' : 'mic'} size={24} color="#fff" />
+          </TouchableOpacity>
+        ) : (
+          <TouchableOpacity
+            style={styles.sendButton}
+            onPress={handleTextSubmit}
+          >
+            <Ionicons name="send" size={22} color="#fff" />
+          </TouchableOpacity>
+        )}
+      </View>
+    </KeyboardAvoidingView>
   );
 };
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: '#f5f5f5' },
+  inputContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    padding: 12,
+    borderTopWidth: 1,
+    borderColor: '#ddd',
+    backgroundColor: '#fff',
+  },
+  input: {
+    flex: 1,
+    backgroundColor: '#f0f0f0',
+    borderRadius: 25,
+    paddingVertical: 10,
+    paddingHorizontal: 16,
+    fontSize: 16,
+  },
   micButton: {
-    position: 'absolute',
-    bottom: 20,
-    alignSelf: 'center',
     backgroundColor: '#6490ab',
-    padding: 20,
+    padding: 12,
+    marginLeft: 10,
     borderRadius: 50,
-    elevation: 5,
   },
   recording: {
     backgroundColor: 'red',
+  },
+  sendButton: {
+    backgroundColor: '#6490ab',
+    padding: 12,
+    marginLeft: 10,
+    borderRadius: 50,
+    justifyContent: 'center',
+    alignItems: 'center',
   },
 });
 
