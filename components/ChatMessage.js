@@ -4,9 +4,16 @@ import { View, Text, StyleSheet } from 'react-native';
 const ChatMessage = ({ message }) => {
   const isUser = message.sender === 'user';
 
+  // 🔐 Sécurise l'affichage même si message.text est un objet
+  const content = typeof message.text === 'string'
+    ? message.text
+    : typeof message.text?.text === 'string'
+    ? message.text.text
+    : JSON.stringify(message.text);
+
   return (
     <View style={[styles.bubble, isUser ? styles.user : styles.bot]}>
-      <Text style={styles.text}>{message.text}</Text>
+      <Text style={styles.text}>{content}</Text>
     </View>
   );
 };
